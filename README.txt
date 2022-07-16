@@ -1,4 +1,3 @@
-
 The Remastered Version of the PACMAN GAME..!
 ==========================================================
 
