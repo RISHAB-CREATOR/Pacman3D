@@ -1,8 +1,7 @@
-Karun Singh (ks939)
-Ashley Xue (ax25)
-Peter Mocarski (pmm248)
-Esther Jun (ejj35)
 
-Instructions: Open index.html. Use the arrow keys to move forward and turn.
+The Remastered Version of the PACMAN GAME..!
+==========================================================
 
-All music/sound effects taken from OpenGameArt.com, and is open source and free to use
+So, basically this is an Game a Browser game made by using webgl and etc...!
+<center><p>Just click on this link to play this game</p>
+https://rishab-creator.github.io/Pacman-Remastered/index.html<center>
