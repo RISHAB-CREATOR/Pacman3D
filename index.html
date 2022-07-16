@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>PRAC-MAN 3D</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/cs4620.css" rel="stylesheet">
+    <link href="css/jquery-ui.min.css" rel="stylesheet">
+    <link href="css/jquery-ui.theme.min.css" rel="stylesheet">
+    <link href="css/jquery-ui.structure.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <script src="full_maze.js"></script>
+    <script src="mesh_data\mini_circle_mesh.js"></script>
+    <script src="mesh_data\ghost_mesh.js"></script>
+    <script src="mesh_data\HD_pacman_mesh.js"></script>
+
+</head>
+<body>
+
+<div style="width: 800px; height: 700px; margin: 0 auto;">
+    <h1 class="retro">PRAC-MAN <span class="subtitle">3D</span></h1>
+    <div style="position: relative;">
+        <div id="score-id" >
+            <div> SCORE: <span id="score">0</span></div>
+        </div>
+        <div id="game-over">
+            GAME OVER!
+        </div>
+        <div id="game-win">
+            YOU WIN!
+        </div>
+        <canvas tabindex="1" id="webglCanvas" style="border: none; background: black;" width="800" height="600"></canvas>
+    </div>
+    <div class="btn-group" role="group" style="width: 100%;" id="all-buttons">
+        <button type="button" class="btn btn-default red active" onclick="setEyeHeight(1.5)" style="width:25%; font-size:10px;">THIRD PERSON</button>
+        <button type="button" class="btn btn-default pink" onclick="setEyeHeight(.525)" style="width:25%; font-size:10px;">FIRST PERSON</button>     
+        <button type="button" class="btn btn-default blue" onclick="setEyeHeight(20)" style="width:25%; font-size:10px;">AERIAL 1</button>
+        <button type="button" class="btn btn-default orange" onclick="setEyeHeight(39.5)" style="width:25%; font-size:10px;">AERIAL 2</button>
+    </div>
+
+    <h2>CREATORS</h2>
+    <div class="pac-name-icon orange" />
+    <div class="pac-name-text"> PETER MOCARSKI </div>
+    <div class="pac-name-icon blue" />
+    <div class="pac-name-text"> ASHLEY XUE </div>
+    <div class="pac-name-icon red" />
+    <div class="pac-name-text"> KARUN SINGH </div>
+    <div class="pac-name-icon pink" />
+    <div class="pac-name-text"> ESTHER JUN </div>
+    <div style="margin-top: 30px"></div>
+</div>
+
+<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+<script src="js/jquery-3.1.1.min.js"></script>
+<script src="js/jquery-ui.min.js"></script>
+<script src="js/gl-matrix-min.js"></script>
+<script src="js/preloadjs-0.6.2.min.js"></script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+    attribute vec3 position;
+    attribute vec2 texture;
+    uniform mat4 tiltRotation;
+    uniform mat4 projection;
+    uniform mat4 rotation;
+    uniform mat4 translation;
+    varying vec3 posPt;
+
+    varying vec2 geom_texCoord;
+
+    void main() {
+        vec4 posCopy = rotation * translation * vec4(position, 1.0);
+        posCopy = vec4(-posCopy.y, posCopy.z, -posCopy.x, posCopy.w);
+        gl_Position = projection * tiltRotation * vec4(posCopy);
+        posPt = position;
+        geom_texCoord = texture;
+    }
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+    precision highp float;
+    varying vec2 geom_texCoord;
+    varying vec3 posPt;
+    uniform vec2 ghostCenter;
+    uniform vec2 pacPos;
+    uniform int lightning; //1 = lightning, 0 = no lightning
+
+    uniform sampler2D texture0;
+    uniform int surface;
+    
+
+    void main() {
+    	float flashLightK = 1.0;
+    	if (lightning == 0){
+    		float distSq = (pacPos.x - posPt.x) * (pacPos.x - posPt.x) + (pacPos.y - posPt.y) * (pacPos.y - posPt.y);
+    		if (distSq < .01) 
+    			distSq = .01;
+    		flashLightK = min(4.0 / distSq, 1.0);
+    	}
+
+        if (surface == 1) {
+            // Wall (Gradient Shading with quadratic fall-off, top is brighter than bottom)
+            gl_FragColor = (posPt.z * sqrt(posPt.z) + .3) * texture2D(texture0, geom_texCoord);
+        } else if (surface == 2) {
+            // Pac Pellets (Lambertion shading with 4 lights above each sphere in a square grid)
+
+            //Note: pac pellet center is hard coded as (.5, .5, .2)
+            vec3 sphereCenter = vec3(floor(posPt.x) + .5, floor(posPt.y) + .5, .2);
+
+            //Light 1 contribution
+            vec3 lightPos = vec3(4, 4, 5) + sphereCenter;
+            vec3 N = normalize(posPt - sphereCenter);
+            vec3 L = normalize(lightPos - posPt);
+            float kd = 20.;
+            float rSqr = length(lightPos - posPt) * length(lightPos - posPt);
+            float lamb1 = kd * max(0.0, dot(N, L)) / rSqr;
+
+            //Light 2 contribution
+            lightPos = vec3(4, -4, 5) + sphereCenter;
+            rSqr = length(lightPos - posPt) * length(lightPos - posPt);
+            L = normalize(lightPos - posPt);
+            float lamb2 = kd * max(0.0, dot(N, L)) / rSqr;
+
+            //Light 3 contribution
+            lightPos = vec3(-4, 4, 5) + sphereCenter;
+            rSqr = length(lightPos - posPt) * length(lightPos - posPt);
+            L = normalize(lightPos - posPt);
+            float lamb3 = kd * max(0.0, dot(N, L)) / rSqr;
+
+            //Light 4 contribution
+            lightPos = vec3(-4, -4, 5) + sphereCenter;
+            rSqr = length(lightPos - posPt) * length(lightPos - posPt);
+            L = normalize(lightPos - posPt);
+            float lamb4 = kd * max(0.0, dot(N, L)) / rSqr;
+
+            //Sum light contributions and assign fragment color
+            gl_FragColor = (lamb1 + lamb2 + lamb3 + lamb4) * vec4(1.0, .8, .6, 1.0);
+        }
+        else if ((surface >= 8 && surface <= 11) || surface == 13) {
+        	//Ghosts (Gradient Shading, top is brighter than bottom)
+        	vec4 ghostColor;
+ 			if (surface == 8) //Red ghost
+ 				ghostColor = vec4(1., 0., 0., 1.);
+ 			else if (surface == 9) //Blue Ghost
+ 				ghostColor = vec4(0., 1., 1., 1.);
+ 			else if (surface == 10) //Pink Ghost
+ 				ghostColor = vec4(1., .75, .85, 1.);
+ 			else if (surface == 11) //Orange Ghost
+ 				ghostColor = vec4(1., .6, 0., 1.);
+            else if (surface == 13) //Power Ghost
+            ghostColor = vec4(0.17, 0.13, 0.92, 1.);
+
+            float radiusSq = (-(posPt.x - ghostCenter.x)*-(posPt.x - ghostCenter.x)) + (-(posPt.y - ghostCenter.y)*-(posPt.y - ghostCenter.y)); 
+            if ((radiusSq < 0.07) && posPt.z < 0.55) {
+                gl_FragColor = .4 * ghostColor;
+            } else {
+                gl_FragColor = (posPt.z + 1.0) * .5 * ghostColor;
+            }
+        }
+        else if (surface == 12) {
+            // Pacman (Gradient shading based on z
+            gl_FragColor = (posPt.z - .1) * 3.0 * vec4(0.9, 0.9, 0.1, 1.0);
+        }
+
+        if (surface != 13) //power ghosts should not be affected
+            gl_FragColor = flashLightK * gl_FragColor;
+    }
+</script>
+
+<script>
+    //Initialize background music
+    bgPowerAudio = new Audio("music/bg-home.mp3"); 
+    bgAudio = new Audio("music/bg-mystical.mp3");
+    bgAudio.addEventListener("ended", function() {
+        this.currentTime = 0;
+        this.play();
+        }, false);
+    bgAudio.play();
+
+    var lightningOn = 0;
+    var thunderAudio = new Audio("music/thunder.mp3");
+    function loopThunder() {
+        thunderAudio.play();
+        lightningOn = 1;
+        var after = Math.floor(Math.random() * 20) + 20;
+        setTimeout(function() {
+            loopThunder();
+        }, after*1000);
+        setTimeout(function() {
+        	lightningOn = 0;
+        }, 400);
+    }
+
+    setTimeout(function() { loopThunder(); }, 5000);
+    
+    
+    function initializeWebGL(canvasName) {
+        var canvas = $("#" + canvasName);
+        // Getting WebGL context the right way
+        var gl = null;
+        try {
+            gl = canvas[0].getContext("experimental-webgl");
+            if (!gl) {
+                gl = canvas[0].getContext("webgl");
+            }
+        } catch (error) {
+            // NO-OP
+        }
+        if (!gl) {
+            alert("Could not get WebGL context!");
+            throw new Error("Could not get WebGL context!");
+        }
+        return gl;
+    }
+
+    function createShader(gl, shaderScriptId) {
+        var shaderScript = $("#" + shaderScriptId);
+        var shaderSource = shaderScript[0].text;
+        var shaderType = null;
+        if (shaderScript[0].type == "x-shader/x-vertex") {
+            shaderType = gl.VERTEX_SHADER;
+        } else if (shaderScript[0].type == "x-shader/x-fragment") {
+            shaderType = gl.FRAGMENT_SHADER;
+        } else {
+            throw new Error("Invalid shader type: " + shaderScript[0].type)
+        }
+        var shader = gl.createShader(shaderType);
+        gl.shaderSource(shader, shaderSource);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            var infoLog = gl.getShaderInfoLog(shader);
+            gl.deleteShader(shader);
+            throw new Error("An error occurred compiling the shader: " + infoLog);
+        } else {
+            return shader;
+        }
+    }
+
+    function createGlslProgram(gl, vertexShaderId, fragmentShaderId) {
+        var program = gl.createProgram();
+        gl.attachShader(program, createShader(gl, vertexShaderId));
+        gl.attachShader(program, createShader(gl, fragmentShaderId));
+        gl.linkProgram(program);
+        gl.validateProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            var infoLog = gl.getProgramInfoLog(program);
+            gl.deleteProgram(program);
+            throw new Error("An error occurred linking the program: " + infoLog);
+        } else {
+            return program;
+        }
+    }
+
+    var vertices = [];
+    var indices = [];
+    var textures = [];
+    var floorIndices = [];
+    var floorVertices = [];
+    var floorTextures = [];
+
+    var objIndices = [];
+    var objVertices = [];
+    var objTextures = [];
+
+    pac_vertices.forEach(function(element, index, array){ array[index] = array[index] * .3;});
+
+    var pacman = {};
+    pacman.vertices = pac_vertices.slice();
+    pacman.textures = [];
+    pacman.indices = pac_indices.slice();
+    pacman.currentPosition = [];
+    pacman.animateToPosition = [];
+    pacman.inMotion = false;
+    pacman.inRotation = false;
+    pacman.unitMotion = [];
+    pacman.currentHeadingCnt = 0;
+    pacman.unitRotation = 0; // in cnt
+    pacman.targetHeadingCnt = 0;
+    pacman.stepSize = 0.1;
+    pacman.vertexArray;
+    pacman.indexArray;
+
+    ghost_vertices.forEach(function(element, index, array) { array[index] = array[index] * .015; });
+
+    var redGhost = {};
+    redGhost.vertices = ghost_vertices.slice();
+    redGhost.indices = ghost_indices.slice();
+    redGhost.currentPosition = [];
+    redGhost.animateToPosition = [];
+    redGhost.inMotion = false;
+    redGhost.inRotation = false;
+    redGhost.isEdible = false;
+    redGhost.unitMotion = [];
+    redGhost.currentHeadingCnt = 0;
+    redGhost.unitRotation = 0;
+    redGhost.targetHeadingCnt = 0;
+    redGhost.stepSize = 0.05;
+    redGhost.textures = [];
+    redGhost.vertexArray;
+    redGhost.indexArray;
+
+    var blueGhost = {};
+    blueGhost.vertices = ghost_vertices.slice();
+    blueGhost.indices = ghost_indices.slice();
+    blueGhost.currentPosition = [];
+    blueGhost.animateToPosition = [];
+    blueGhost.inMotion = false;
+    blueGhost.inRotation = false;
+    blueGhost.isEdible = false;
+    blueGhost.unitMotion = [];
+    blueGhost.currentHeadingCnt = 0;
+    blueGhost.unitRotation = 0;
+    blueGhost.targetHeadingCnt = 0;
+    blueGhost.stepSize = 0.05;
+    blueGhost.textures = [];
+    blueGhost.vertexArray;
+    blueGhost.indexArray;
+
+    var pinkGhost = {};
+    pinkGhost.vertices = ghost_vertices.slice();
+    pinkGhost.indices = ghost_indices.slice();
+    pinkGhost.currentPosition = [];
+    pinkGhost.animateToPosition = [];
+    pinkGhost.inMotion = false;
+    pinkGhost.inRotation = false;
+    pinkGhost.isEdible = false;
+    pinkGhost.unitMotion = [];
+    pinkGhost.currentHeadingCnt = 0;
+    pinkGhost.unitRotation = 0;
+    pinkGhost.targetHeadingCnt = 0;
+    pinkGhost.stepSize = 0.05;
+    pinkGhost.textures = [];
+    pinkGhost.vertexArray;
+    pinkGhost.indexArray;
+
+    var orangeGhost = {};
+    orangeGhost.vertices = ghost_vertices.slice();
+    orangeGhost.indices = ghost_indices.slice();
+    orangeGhost.currentPosition = [];
+    orangeGhost.animateToPosition = [];
+    orangeGhost.inMotion = false;
+    orangeGhost.inRotation = false;
+    orangeGhost.isEdible = false;
+    orangeGhost.unitMotion = [];
+    orangeGhost.currentHeadingCnt = 0;
+    orangeGhost.unitRotation = 0;
+    orangeGhost.targetHeadingCnt = 0;
+    orangeGhost.stepSize = 0.05;
+    orangeGhost.textures = [];
+    orangeGhost.vertexArray;
+    orangeGhost.indexArray;
+
+    var totalPoints = 0;
+    var totalPelletsLeft = 0;
+
+    var powerHour = 0;
+    var flashingState = 0;
+
+    var walkAudio = new Audio("music/walk.mp3");
+    var gameInProgress = true;
+
+    function updateMazeMesh() {
+        vertices = [];
+        textures = [];
+        indices = [];
+        floorVertices = [];
+        floorTextures = [];
+        floorIndices = [];
+        var height = maze.sizeY;
+        var width = maze.sizeX;
+        for (var x = 0; x < maze.data.length; x++) {
+            for (var y = 0; y < maze.data[0].length; y++) {
+                if (maze.data[x][y] == 1) {
+                    var left = x * 1.0;
+                    var right = left + 1.0;
+                    var bottom = y * 1.0;
+                    var top = bottom + 1.0;
+                    var one = [left, bottom, 0.0];
+                    var two = [left, top, 0.0];
+                    var three = [right, bottom, 0.0];
+                    var four = [right, top, 0.0];
+                    var five = [left, bottom, .5];
+                    var six = [left, top, .5];
+                    var seven = [right, bottom, .5];
+                    var eight = [right, top, .5];
+
+                    var blTex = [0.0, 0.0];
+                    var brTex = [3.0, 0.0];
+                    var tlTex = [0.0, 3.0];
+                    var trTex = [3.0, 3.0];
+
+                    vertices = vertices.concat(one).concat(two).concat(three);
+                    textures = textures.concat(blTex).concat(tlTex).concat(brTex);
+                    vertices = vertices.concat(two).concat(four).concat(three);
+                    textures = textures.concat(tlTex).concat(trTex).concat(brTex);
+                    vertices = vertices.concat(seven).concat(three).concat(four);
+                    textures = textures.concat(tlTex).concat(blTex).concat(brTex);
+                    vertices = vertices.concat(eight).concat(seven).concat(four);
+                    textures = textures.concat(trTex).concat(tlTex).concat(brTex);
+                    vertices = vertices.concat(five).concat(seven).concat(six);
+                    textures = textures.concat(blTex).concat(brTex).concat(tlTex);
+                    vertices = vertices.concat(seven).concat(eight).concat(six);
+                    textures = textures.concat(brTex).concat(trTex).concat(tlTex);
+                    vertices = vertices.concat(five).concat(one).concat(three);
+                    textures = textures.concat(tlTex).concat(blTex).concat(brTex);
+                    vertices = vertices.concat(seven).concat(five).concat(three);
+                    textures = textures.concat(trTex).concat(tlTex).concat(brTex);
+                    vertices = vertices.concat(five).concat(two).concat(one);
+                    textures = textures.concat(trTex).concat(blTex).concat(brTex);
+                    vertices = vertices.concat(six).concat(two).concat(five);
+                    textures = textures.concat(tlTex).concat(blTex).concat(trTex);
+                    vertices = vertices.concat(six).concat(four).concat(two);
+                    textures = textures.concat(trTex).concat(blTex).concat(brTex);
+                    vertices = vertices.concat(six).concat(eight).concat(four);
+                    textures = textures.concat(trTex).concat(tlTex).concat(blTex);
+                }
+            }
+        }
+
+        updateMazeMeshObjects(true, -1, -1);
+
+        var bottomLeft = [0, 0, 0];
+        var bottomRight = [width, 0, 0];
+        var topLeft = [0, height, 0];
+        var topRight = [width, height, 0];
+        floorVertices = floorVertices.concat(bottomLeft).concat(bottomRight).concat(topLeft);
+        floorVertices = floorVertices.concat(bottomRight).concat(topRight).concat(topLeft);
+        // Set floor indices
+        floorIndices = [0, 1, 2, 3, 4, 5];
+        // Set floor textures
+        floorTextures = [0, 0, width*4, 0, 0, height*4, width*4, 0, width*4, height*4, 0, height*4];
+
+        for (var x = 0; x < vertices.length / 3; x++) {
+            indices.push(x);
+        }
+
+        pacman.currentPosition = maze.startPosition;
+        pacman.currentHeadingCnt = maze.startHeading;
+    }
+
+    var circleScaled = [];
+    circleScaled.length = circle_vertices.length;
+    function updateMazeMeshObjects(isInit, posX, posY) {
+        // Update
+        if (!isInit){
+            var numObj = 0;
+            var ctCurr = 0;
+            for (var x = 0; x < maze.data.length; x++) {
+                for (var y = 0; y < maze.data[0].length; y++) {
+                    if (maze.data[x][y] == 2 || maze.data[x][y] == 3 || (x == posX && y == posY)) {
+                        if (posX == x && posY == y){
+                            ctCurr = numObj;
+                        }
+                        numObj++;
+                    }
+                }
+            }
+            var indxPerObj = (objIndices.length / numObj);
+            var firstIndx = ctCurr * indxPerObj;
+            objIndices.splice(firstIndx, indxPerObj);
+            return;
+        }
+
+        //Initialization
+        objVertices = [];
+        objTextures = [];
+        objIndices = [];
+        var cXlocal = .5;
+        var cYlocal = .5;
+        var cZlocal = .2;
+
+        for (var x = 0; x < maze.data.length; x++) {
+            for (var y = 0; y < maze.data[0].length; y++) {
+                if (maze.data[x][y] != 2 && maze.data[x][y] != 3) {
+                    continue;
+                }
+                var cX = x + cXlocal;
+                var cY = y + cYlocal;
+                var cZ = cZlocal;
+                var initLength = objVertices.length / 3;
+                if (maze.data[x][y] == 2) {
+                    scale = 0.1;
+                } else if (maze.data[x][y] == 3) {
+                    scale = 0.2;
+                }
+
+                for (var i = 0; i < circle_vertices.length; i++){
+                    if (i % 3 == 0) {
+                        circleScaled[i] = circle_vertices[i] * scale + cX;
+                    }
+                    else if ((i-1) % 3 == 0) {
+                        circleScaled[i] = circle_vertices[i] * scale + cY;
+                    }
+                    else if ((i-2) % 3 == 0) {
+                        circleScaled[i] = circle_vertices[i] * scale + cZ;
+                    }
+                }
+
+                objVertices = objVertices.concat(circleScaled);
+                var foo = circle_indices.map(function(x) { return x + initLength; });
+                objIndices = objIndices.concat(foo);
+            }
+        }
+    }
+
+    function updateGhost(ghost) {
+        var x, y;
+        var cos = Math.cos((ghost.currentHeadingCnt - 1) * Math.PI / 2.0);
+        var sin = Math.sin((ghost.currentHeadingCnt - 1) * Math.PI / 2.0);
+        for (var i = 0; i < ghost.vertices.length / 3; i++) {
+            x = ghost_vertices[3 * i];
+            y = ghost_vertices[3 * i + 1];
+            ghost.vertices[3 * i] = cos * x - sin * y + ghost.currentPosition[0] + 0.5;
+            ghost.vertices[3 * i + 1] = sin * x + cos * y + ghost.currentPosition[1] + 0.5;
+        }
+    }
+
+    function updateGhosts() {
+        updateGhost(redGhost);
+        updateGhost(blueGhost);
+        updateGhost(pinkGhost);
+        updateGhost(orangeGhost);
+    }
+
+    function updatePacman() {
+        var cX = pacman.currentPosition[0] + 0.5;
+        var cY = pacman.currentPosition[1] + 0.5;
+        var cZ = .2;
+        for (var i = 0; i < pacman.vertices.length; i++) {
+            if (i % 3 == 0) {
+                pacman.vertices[i] = pac_vertices[i] + cX;
+            }
+            else if ((i - 1) % 3 == 0) {
+                pacman.vertices[i] = pac_vertices[i] + cY;
+            }
+            else if ((i - 2) % 3 == 0) {
+                pacman.vertices[i] = pac_vertices[i] + cZ;
+            }
+        }
+    }
+
+    function createTexture(gl, image) {
+        var texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return texture;
+    }
+
+    function runCanvas(canvasName, vertexShaderName, fragmentShaderName) {
+        var gl = initializeWebGL(canvasName);
+        var program = createGlslProgram(gl, vertexShaderName, fragmentShaderName);
+        ["texture0"].forEach(function(name) {
+            program[name] = gl.getUniformLocation(program, name);
+        });
+
+        var wallTexture = createTexture(gl, queue.getResult("wall", false));
+
+        gl.useProgram(program);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, wallTexture);
+        gl.uniform1i(program.texture0, 0);
+
+        var vertexArray;
+        var vertexBuffer = gl.createBuffer();
+        var floorVertexArray;
+        var floorVertexBuffer = gl.createBuffer();
+        var objVertexArray;
+        var objVertexBuffer = gl.createBuffer();
+        pacman.vertexBuffer = gl.createBuffer();
+        var textureArray;
+        var textureBuffer = gl.createBuffer();
+        var indexArray;
+        var indexBuffer = gl.createBuffer();
+        var objIndexArray;
+        var objIndexBuffer = gl.createBuffer();
+        pacman.indexBuffer = gl.createBuffer();
+        redGhost.vertexBuffer = gl.createBuffer();
+        redGhost.indexBuffer = gl.createBuffer();
+        blueGhost.vertexBuffer = gl.createBuffer();
+        blueGhost.indexBuffer = gl.createBuffer();
+        pinkGhost.vertexBuffer = gl.createBuffer();
+        pinkGhost.indexBuffer = gl.createBuffer();
+        orangeGhost.vertexBuffer = gl.createBuffer();
+        orangeGhost.indexBuffer = gl.createBuffer();
+
+        var surfaceUniform = gl.getUniformLocation(program, "surface");
+        var ghostCenterUniform = gl.getUniformLocation(program, "ghostCenter");
+        var pacPosUniform = gl.getUniformLocation(program, "pacPos");
+        var lightningUniform = gl.getUniformLocation(program, "lightning");
+        var positionAttribute = gl.getAttribLocation(program, "position");
+        gl.enableVertexAttribArray(positionAttribute);
+        var textureAttribute = gl.getAttribLocation(program, "texture");
+        gl.enableVertexAttribArray(textureAttribute);
+
+        function updateWebGL() {
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.uniform1i(lightningUniform, lightningOn);
+
+            // UPDATE CURRENT POSITION IF IN MOTION
+            if (pacman.inMotion) {
+
+                if (walkAudio.paused) {
+                    walkAudio.currentTime = 0;
+                    walkAudio.play();
+                }
+
+                pacman.currentPosition[0] += pacman.unitMotion[0];
+                pacman.currentPosition[1] += pacman.unitMotion[1];
+                if (Math.abs(pacman.animateToPosition[0] - pacman.currentPosition[0]) < 0.01 && Math.abs(pacman.animateToPosition[1] - pacman.currentPosition[1]) < 0.01) {
+                    pacman.currentPosition[0] = pacman.animateToPosition[0];
+                    pacman.currentPosition[1] = pacman.animateToPosition[1];
+                    pacman.inMotion = false;
+                }
+            }
+            if (pacman.inRotation) {
+                pacman.currentHeadingCnt += pacman.unitRotation;
+                if (Math.abs(pacman.currentHeadingCnt - pacman.targetHeadingCnt) < 0.01) {
+                    pacman.currentHeadingCnt = (pacman.targetHeadingCnt+4) % 4;
+                    pacman.inRotation = false;
+                }
+            }
+
+            // UPDATE RED GHOST POSITION/ROTATION
+            if (redGhost.inMotion) {
+                redGhost.currentPosition[0] += redGhost.unitMotion[0];
+                redGhost.currentPosition[1] += redGhost.unitMotion[1];
+                if (Math.abs(redGhost.animateToPosition[0] - redGhost.currentPosition[0]) < 0.01 && Math.abs(redGhost.animateToPosition[1] - redGhost.currentPosition[1]) < 0.01) {
+                    redGhost.currentPosition[0] = redGhost.animateToPosition[0];
+                    redGhost.currentPosition[1] = redGhost.animateToPosition[1];
+                    redGhost.inMotion = false;
+                }
+            }
+            if (redGhost.inRotation) {
+                redGhost.currentHeadingCnt += redGhost.unitRotation;
+                if (Math.abs(redGhost.currentHeadingCnt - redGhost.targetHeadingCnt) < 0.01) {
+                    redGhost.currentHeadingCnt = (redGhost.targetHeadingCnt+4) % 4;
+                    redGhost.inRotation = false;
+                }
+            }
+
+            // UPDATE PINK GHOST POSITION/ROTATION
+            if (pinkGhost.inMotion) {
+                pinkGhost.currentPosition[0] += pinkGhost.unitMotion[0];
+                pinkGhost.currentPosition[1] += pinkGhost.unitMotion[1];
+                if (Math.abs(pinkGhost.animateToPosition[0] - pinkGhost.currentPosition[0]) < 0.01 && Math.abs(pinkGhost.animateToPosition[1] - pinkGhost.currentPosition[1]) < 0.01) {
+                    pinkGhost.currentPosition[0] = pinkGhost.animateToPosition[0];
+                    pinkGhost.currentPosition[1] = pinkGhost.animateToPosition[1];
+                    pinkGhost.inMotion = false;
+                }
+            }
+            if (pinkGhost.inRotation) {
+                pinkGhost.currentHeadingCnt += pinkGhost.unitRotation;
+                if (Math.abs(pinkGhost.currentHeadingCnt - pinkGhost.targetHeadingCnt) < 0.01) {
+                    pinkGhost.currentHeadingCnt = (pinkGhost.targetHeadingCnt+4) % 4;
+                    pinkGhost.inRotation = false;
+                }
+            }
+
+            // UPDATE BLUE GHOST POSITION/ROTATION
+            if (blueGhost.inMotion) {
+                blueGhost.currentPosition[0] += blueGhost.unitMotion[0];
+                blueGhost.currentPosition[1] += blueGhost.unitMotion[1];
+                if (Math.abs(blueGhost.animateToPosition[0] - blueGhost.currentPosition[0]) < 0.01 && Math.abs(blueGhost.animateToPosition[1] - blueGhost.currentPosition[1]) < 0.01) {
+                    blueGhost.currentPosition[0] = blueGhost.animateToPosition[0];
+                    blueGhost.currentPosition[1] = blueGhost.animateToPosition[1];
+                    blueGhost.inMotion = false;
+                }
+            }
+            if (blueGhost.inRotation) {
+                blueGhost.currentHeadingCnt += blueGhost.unitRotation;
+                if (Math.abs(blueGhost.currentHeadingCnt - blueGhost.targetHeadingCnt) < 0.01) {
+                    blueGhost.currentHeadingCnt = (blueGhost.targetHeadingCnt+4) % 4;
+                    blueGhost.inRotation = false;
+                }
+            }
+
+            // UPDATE ORANGE GHOST POSITION/ROTATION
+            if (orangeGhost.inMotion) {
+                orangeGhost.currentPosition[0] += orangeGhost.unitMotion[0];
+                orangeGhost.currentPosition[1] += orangeGhost.unitMotion[1];
+                if (Math.abs(orangeGhost.animateToPosition[0] - orangeGhost.currentPosition[0]) < 0.01 && Math.abs(orangeGhost.animateToPosition[1] - orangeGhost.currentPosition[1]) < 0.01) {
+                    orangeGhost.currentPosition[0] = orangeGhost.animateToPosition[0];
+                    orangeGhost.currentPosition[1] = orangeGhost.animateToPosition[1];
+                    orangeGhost.inMotion = false;
+                }
+            }
+            if (orangeGhost.inRotation) {
+                orangeGhost.currentHeadingCnt += orangeGhost.unitRotation;
+                if (Math.abs(orangeGhost.currentHeadingCnt - orangeGhost.targetHeadingCnt) < 0.01) {
+                    orangeGhost.currentHeadingCnt = (orangeGhost.targetHeadingCnt+4) % 4;
+                    orangeGhost.inRotation = false;
+                }
+            }
+
+
+            if (pacGhostInteraction()) {
+            	var deathAudio = new Audio("music/ghost.mp3"); 
+            	deathAudio.play();
+                return; // dead, game over, good night
+            }
+            if (totalPelletsLeft <= 0) {
+                endGameWin();
+                var winAudio = new Audio("music/win.mp3");
+                bgAudio.pause(); 
+                bgPowerAudio.pause();
+            	winAudio.play();
+                return; // you win, good job, good night
+            }
+            updateGhosts();
+            updatePacman();
+            
+
+            vertexArray = new Float32Array(vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            floorVertexArray = new Float32Array(floorVertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, floorVertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, floorVertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            objVertexArray = new Float32Array(objVertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, objVertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, objVertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            redGhost.vertexArray = new Float32Array(redGhost.vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, redGhost.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, redGhost.vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            blueGhost.vertexArray = new Float32Array(blueGhost.vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, blueGhost.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, blueGhost.vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            pinkGhost.vertexArray = new Float32Array(pinkGhost.vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, pinkGhost.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, pinkGhost.vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            orangeGhost.vertexArray = new Float32Array(orangeGhost.vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, orangeGhost.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, orangeGhost.vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            pacman.vertexArray = new Float32Array(pacman.vertices);
+            gl.bindBuffer(gl.ARRAY_BUFFER, pacman.vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, pacman.vertexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            textureArray = new Float32Array(textures);
+            gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, textureArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            indexArray = new Uint16Array(indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            objIndexArray = new Uint16Array(objIndices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, objIndexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, objIndexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            redGhost.indexArray = new Uint16Array(redGhost.indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, redGhost.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, redGhost.indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            blueGhost.indexArray = new Uint16Array(blueGhost.indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, blueGhost.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, blueGhost.indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            pinkGhost.indexArray = new Uint16Array(pinkGhost.indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pinkGhost.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pinkGhost.indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            orangeGhost.indexArray = new Uint16Array(orangeGhost.indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, orangeGhost.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, orangeGhost.indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            pacman.indexArray = new Uint16Array(pacman.indices);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pacman.indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pacman.indexArray, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // DRAW WALLS-----------------------------------------------------------
+            gl.uniform1i(surfaceUniform, 1);
+
+            // POSITION ATTRIBUTE
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // TEXTURE ATTRIBUTE
+            gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+            gl.vertexAttribPointer(textureAttribute, 2, gl.FLOAT, false, 4*2, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            var projMat = mat4.create();
+            mat4.perspective(projMat, getFov(), 800.0 / 600.0, 0.1, 100.0);
+            var projectionLocation = gl.getUniformLocation(program, "projection");
+            gl.uniformMatrix4fv(projectionLocation, false, projMat);
+
+            var angle = -(pacman.currentHeadingCnt * Math.PI/2);
+            var rot = mat4.fromValues(Math.cos(angle), -Math.sin(angle), 0, 0,
+                Math.sin(angle), Math.cos(angle), 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1);
+            mat4.transpose(rot, rot);
+            var rotationLocation = gl.getUniformLocation(program, "rotation");
+            gl.uniformMatrix4fv(rotationLocation, false, rot);  
+
+            var tilt;
+            if (getEyeHeight() <= 1.0){
+                tilt = 0.0;
+            }
+            else if (getEyeHeight() < 10.0){
+                tilt = Math.PI / 12;
+            }
+            else{
+                tilt = Math.PI / 2;
+            }
+            var tiltRot = mat4.fromValues(1, 0, 0, 0,
+                0, Math.cos(tilt), -Math.sin(tilt), 0,
+                0, Math.sin(tilt), Math.cos(tilt), 0,
+                0, 0, 0, 1);
+            mat4.transpose(tiltRot, tiltRot);
+            var tiltRotationLocation = gl.getUniformLocation(program, "tiltRotation");
+            gl.uniformMatrix4fv(tiltRotationLocation, false, tiltRot);
+
+
+            var xOffset = 0;
+            var yOffset = 0;
+            if (getEyeHeight() > 1.0 && getEyeHeight() < 10.0){
+                xOffset = -2 * Math.cos(angle);
+                yOffset = 2 * Math.sin(angle);
+            }
+
+            var trans = mat4.fromValues(1, 0, 0, -(pacman.currentPosition[0]+ .5 + xOffset),
+                0, 1, 0, -(pacman.currentPosition[1] + .5 + yOffset),
+                0, 0, 1, -getEyeHeight(),
+                0, 0, 0, 1);
+            mat4.transpose(trans, trans);
+            var translationLocation = gl.getUniformLocation(program, "translation");
+            gl.uniformMatrix4fv(translationLocation, false, trans);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ---------------------------------------------------------------------------
+
+            // DRAW OBJECTS
+            gl.uniform1i(surfaceUniform, 2);
+
+            // SET POSITION OF OBJECTS
+            gl.bindBuffer(gl.ARRAY_BUFFER, objVertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, objIndexBuffer);
+            gl.drawElements(gl.TRIANGLES, objIndices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+            // Draw red ghost.
+            if (!redGhost.isEdible) {
+                gl.uniform1i(surfaceUniform, 8);
+            } else {
+                gl.uniform1i(surfaceUniform, 13);
+            }
+
+            // Set center of ghost
+            gl.uniform2f(ghostCenterUniform, redGhost.currentPosition[0]+0.5, redGhost.currentPosition[1]+0.5);
+
+            // SET POSITION OF ghost.
+            gl.bindBuffer(gl.ARRAY_BUFFER, redGhost.vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, redGhost.indexBuffer);
+            gl.drawElements(gl.TRIANGLES, redGhost.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+            // Draw blue ghost.
+            if (!blueGhost.isEdible) {
+                gl.uniform1i(surfaceUniform, 9);
+            } else {
+                gl.uniform1i(surfaceUniform, 13);
+            }
+
+            // Set center of ghost
+            gl.uniform2f(ghostCenterUniform, blueGhost.currentPosition[0]+0.5, blueGhost.currentPosition[1]+0.5);
+
+            // SET POSITION OF blue.
+            gl.bindBuffer(gl.ARRAY_BUFFER, blueGhost.vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, blueGhost.indexBuffer);
+            gl.drawElements(gl.TRIANGLES, blueGhost.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+            // Draw pink ghost.
+            if (!pinkGhost.isEdible) {
+                gl.uniform1i(surfaceUniform, 10);
+            } else {
+                gl.uniform1i(surfaceUniform, 13);
+            }
+
+            // Set center of ghost
+            gl.uniform2f(ghostCenterUniform, pinkGhost.currentPosition[0]+0.5, pinkGhost.currentPosition[1]+0.5);
+
+            // SET POSITION OF pink.
+            gl.bindBuffer(gl.ARRAY_BUFFER, pinkGhost.vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pinkGhost.indexBuffer);
+            gl.drawElements(gl.TRIANGLES, pinkGhost.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+            // Draw orange ghost.
+            if (!orangeGhost.isEdible) {
+                gl.uniform1i(surfaceUniform, 11);
+            } else {
+                gl.uniform1i(surfaceUniform, 13);
+            }
+
+            // Set center of ghost
+            gl.uniform2f(ghostCenterUniform, orangeGhost.currentPosition[0]+0.5, orangeGhost.currentPosition[1]+0.5);
+
+            // SET POSITION OF orange.
+            gl.bindBuffer(gl.ARRAY_BUFFER, orangeGhost.vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, orangeGhost.indexBuffer);
+            gl.drawElements(gl.TRIANGLES, orangeGhost.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+            // Draw pacman.
+            gl.uniform1i(surfaceUniform, 12);
+            gl.uniform2f(pacPosUniform, pacman.currentPosition[0]+0.5, pacman.currentPosition[1]+0.5);
+
+
+            // SET POSITION OF pacman.
+            gl.bindBuffer(gl.ARRAY_BUFFER, pacman.vertexBuffer);
+            gl.vertexAttribPointer(positionAttribute, 3, gl.FLOAT, false, 4*3, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            // DISABLE TEXTURE
+            gl.disableVertexAttribArray(textureAttribute);
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pacman.indexBuffer);
+            gl.drawElements(gl.TRIANGLES, pacman.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            // ENABLE TEXTURE
+            gl.enableVertexAttribArray(textureAttribute);
+
+            // ----------------------------------------------------------------------------
+
+            window.requestAnimationFrame(updateWebGL);
+        }
+
+        window.requestAnimationFrame(updateWebGL);
+    }
+
+    // Step 1: Create a LoadQueue object.
+    var queue = new createjs.LoadQueue();
+    // Step 2: Register the callback function.
+    queue.on("complete", function() {
+        runCanvas("webglCanvas", "vertexShader", "fragmentShader");
+    }, this);
+    // Step 3: List the files you want to load, with their correponding ID.
+    queue.loadManifest([
+        {
+            id: "wall",
+            src: "data/wall.jpg"
+        }
+    ]);
+
+
+
+</script>
+
+
+<script>
+    var eyeHeight = 1.5;
+    var scoreElement = document.getElementById("score");
+    var numGhostsEaten = 0;
+
+    $(function() {
+        $('button').click( function() {
+            $(this).addClass('active').siblings().removeClass('active');
+        });
+    });
+
+    $("#game-over").click(function() {
+        location.reload();
+    });
+
+    $("#game-win").click(function() {
+        location.reload();
+    });
+
+    function setEyeHeight(x){
+        eyeHeight = x;
+        $("#webglCanvas").focus();
+    }
+
+    function getFov() {
+        return 45.01 * Math.PI / 180.0;
+    }
+
+    function getEyeHeight() {
+        return eyeHeight;
+    }
+
+    function getMazeStrings() {
+        return mazeDescription.trim().split(/\s/);
+    }
+
+    function createMazeFromStrings(strings) {
+        var sizeY = strings.length;
+        var sizeX = strings[0].length;
+
+        var x, y;
+        var data = [];
+        for (x = 0; x < sizeX; x++) {
+            var a = [];
+            for (y = 0; y < sizeY; y++) {
+                a.push(null);
+            }
+            data.push(a);
+        }
+
+        var startPosition = null;
+        var startHeading = null;
+        for (x = 0; x < sizeX; x++) {
+            for (y = 0; y < sizeY; y++) {
+                var c = strings[sizeY - y - 1][x];
+                if (c == "#") {
+                    data[x][y] = 1;
+                } else if (c == '*') {
+                    data[x][y] = 2;
+                    totalPelletsLeft += 1;
+                } else if (c == '$') {
+                    data[x][y] = 3;
+                    totalPelletsLeft += 1;
+                } else if (c == 'R') {
+                    data[x][y] = 4;
+                    redGhost.currentHeadingCnt = 1;
+                    redGhost.currentPosition = [x, y];
+                } else if (c == 'B') {
+                    data[x][y] = 5;
+                    blueGhost.currentHeadingCnt = 1;
+                    blueGhost.currentPosition = [x, y];
+                } else if (c == 'P') {
+                    data[x][y] = 6;
+                    pinkGhost.currentHeadingCnt = 1;
+                    pinkGhost.currentPosition = [x, y];
+                } else if (c == 'O') {
+                    data[x][y] = 7;
+                    orangeGhost.currentHeadingCnt = 1;
+                    orangeGhost.currentPosition = [x, y];
+                } else {
+                    data[x][y] = 0;
+                }
+
+                if (c == "N" || c == "E" || c == "W" || c == "S") {
+                    if (startPosition == null) {
+                        if (c == "N") {
+                            pacman.currentHeadingCnt = 1;
+                        } else if (c == "E") {
+                            pacman.currentHeadingCnt = 0;
+                        } else if (c == "W") {
+                            pacman.currentHeadingCnt = 2;
+                        } else if (c == "S") {
+                            pacman.currentHeadingCnt = 3;
+                        }
+                        startPosition = [x, y];
+                        startHeading = pacman.currentHeadingCnt * Math.PI / 2.;
+                    } else {
+                        throw new Error("There are more than one starting point!");
+                    }
+                }
+            }
+        }
+
+        if (startPosition == null) {
+            throw new Error("There is no starting point!");
+        }
+
+        return {
+            sizeX: sizeX,
+            sizeY: sizeY,
+            data: data,
+            startHeading: startHeading,
+            startPosition: startPosition
+        };
+    }
+
+    var maze = null;
+    function updateMaze() {
+        maze = createMazeFromStrings(getMazeStrings());
+        updateMazeMesh();
+    }
+    updateMaze();
+
+    $("#webglCanvas").keydown(function (event) {
+        if (!gameInProgress) return false;
+        if (event.keyCode == 37 && !pacman.inMotion && !pacman.inRotation) {
+            // LEFT
+            pacman.inRotation = true;
+            pacman.targetHeadingCnt = (pacman.currentHeadingCnt + 1);
+            pacman.unitRotation = pacman.stepSize;
+
+        } else if (event.keyCode == 39 && !pacman.inMotion && !pacman.inRotation) {
+            // RIGHT
+            pacman.inRotation = true;
+            pacman.targetHeadingCnt = (pacman.currentHeadingCnt - 1);
+            pacman.unitRotation = -pacman.stepSize;
+        }
+        else if ((event.keyCode == 38 || event.keyCode == 40) && !pacman.inMotion && !pacman.inRotation) {
+            // FORWARD OR BACKWARD
+            var newPosition = [pacman.currentPosition[0], pacman.currentPosition[1]];
+            var positiveIncrement = 1;
+            var negativeIncrement = -1;
+            if (event.keyCode == 40) {
+                positiveIncrement = -1;
+                negativeIncrement = 1;
+            }
+            switch(pacman.currentHeadingCnt){
+                case 0:
+                    newPosition[0] += positiveIncrement;
+                    pacman.unitMotion = [positiveIncrement * pacman.stepSize, 0];
+                    break;
+                case 1:
+                    newPosition[1] += positiveIncrement;
+                    pacman.unitMotion = [0, positiveIncrement * pacman.stepSize];
+                    break;
+                case 2:
+                    newPosition[0] += negativeIncrement;
+                    pacman.unitMotion = [negativeIncrement * pacman.stepSize, 0];
+                    break;
+                case 3:
+                    newPosition[1] += negativeIncrement;
+                    pacman.unitMotion = [0, negativeIncrement * pacman.stepSize];
+                    break;
+                default:
+                    console.log("ERROR, INVALID CASE");
+            }
+
+            if (newPosition[0] >= maze.sizeX) {
+                pacman.inMotion = true;
+                pacman.currentPosition[0] = -1;
+                pacman.animateToPosition[0] = 0;
+                pacman.animateToPosition[1] = pacman.currentPosition[1];
+            } else if (newPosition[0] < 0) {
+                pacman.inMotion = true;
+                pacman.currentPosition[0] = maze.sizeX;
+                pacman.animateToPosition[0] = maze.sizeX - 1;
+                pacman.animateToPosition[1] = pacman.currentPosition[1];
+            } else if (newPosition[1] >= maze.sizeY) {
+                pacman.inMotion = true;
+                pacman.currentPosition[1] = -1;
+                pacman.animateToPosition[0] = pacman.currentPosition[0];
+                pacman.animateToPosition[1] = 0;
+            } else if (newPosition[1] < 0) {
+                pacman.inMotion = true;
+                pacman.currentPosition[1] = maze.sizeY;
+                pacman.animateToPosition[0] = pacman.currentPosition[0];
+                pacman.animateToPosition[1] = maze.sizeY - 1;
+            } else if (maze.data[newPosition[0]][newPosition[1]] != 1) {
+                pacman.animateToPosition = newPosition;
+                pacman.inMotion = true;
+                if (maze.data[newPosition[0]][newPosition[1]] == 2) {
+                    // Eat it!
+                    totalPoints += 10;
+                    totalPelletsLeft -= 1;
+                    scoreElement.textContent = totalPoints;
+                    maze.data[newPosition[0]][newPosition[1]] = 0;
+                    updateMazeMeshObjects(false, newPosition[0], newPosition[1]);
+                } else if (maze.data[newPosition[0]][newPosition[1]] == 3) {
+                    // Eat it - power pellet!
+                    redGhost.isEdible = true;
+                    orangeGhost.isEdible = true;
+                    pinkGhost.isEdible = true;
+                    blueGhost.isEdible = true;
+                    numGhostsEaten = 0;
+                    totalPoints += 50;
+                    totalPelletsLeft -= 1;
+                    scoreElement.textContent = totalPoints;
+                    maze.data[newPosition[0]][newPosition[1]] = 0;
+                    updateMazeMeshObjects(false, newPosition[0], newPosition[1]);
+                    powerHour = 10;
+                    flashingState = 0;
+                    startPowerTimer(10);
+                    if (bgPowerAudio.paused) {
+                        bgPowerAudio.currentTime = 0;
+                        bgPowerAudio.play();
+                        bgAudio.volume = 0.35;
+                        bgPowerAudio.volume = 1;
+                    }
+                }
+            }
+        }
+        return false;
+    });
+
+    function pacIntersectsGhost(g){
+        return Math.pow(pacman.currentPosition[0] - g.currentPosition[0], 2.) + 
+                Math.pow(pacman.currentPosition[1] - g.currentPosition[1], 2.) <= .25;
+    }
+
+    function eatGhost(g){
+        numGhostsEaten += 1;
+        g.currentPosition = [11, 11];
+        g.currentHeadingCnt = 1;
+        g.inMotion = false;
+        g.inRotation = false;
+        totalPoints += 100 * Math.pow(2, numGhostsEaten);
+        scoreElement.textContent = totalPoints;
+        g.isEdible = false;
+    }
+
+    function endGameLose() {
+        gameInProgress = false;
+        document.getElementById("all-buttons").style.display = "none";
+        document.getElementById("game-over").style.display = "block";
+    }
+
+    function endGameWin() {
+        gameInProgress = false;
+        document.getElementById("all-buttons").style.display = "none";
+        document.getElementById("game-win").style.display = "block";
+    }
+
+    function pacIsDead(interRed, interBlue, interOrange, interPink){
+        return ((interRed && !redGhost.isEdible) || (interOrange && !orangeGhost.isEdible) || 
+                (interBlue && !blueGhost.isEdible) || (interPink && !pinkGhost.isEdible));
+    }
+
+    // returns true if PacMan is dead
+    function pacGhostInteraction(){
+        var interRed = pacIntersectsGhost(redGhost);
+        var interBlue = pacIntersectsGhost(blueGhost);
+        var interOrange = pacIntersectsGhost(orangeGhost);
+        var interPink = pacIntersectsGhost(pinkGhost);
+        if (pacIsDead(interRed, interBlue, interOrange, interPink)){
+            endGameLose();
+            return true;
+         }
+        if (interRed){
+            eatGhost(redGhost);
+         }
+         if (interBlue){
+            eatGhost(blueGhost);
+         }
+         if (interPink){
+            eatGhost(pinkGhost);
+         }
+         if (interOrange){
+            eatGhost(orangeGhost);
+         }
+         return false;
+    }
+
+    function startPowerTimer(previous) {
+        if (powerHour > previous) {
+            return;
+        }
+        var initPowerHour = powerHour;
+        setTimeout(function() {
+            powerHour -= 0.2;
+            var canvasElement = document.getElementById("webglCanvas");
+            if (powerHour < 4) {
+                if (flashingState == 0) {
+                    canvasElement.style.background = "aqua";
+                } else {
+                    canvasElement.style.background = "black";
+                }
+                flashingState = 1 - flashingState;
+            } else {
+                canvasElement.style.background = "aqua";
+            }
+            if (powerHour > 0) {
+                startPowerTimer(initPowerHour);
+            } else {
+                canvasElement.style.background = "black";
+                redGhost.isEdible = false;
+                orangeGhost.isEdible = false;
+                blueGhost.isEdible = false;
+                pinkGhost.isEdible = false;
+                bgPowerAudio.pause();
+                bgAudio.volume = 1.0;
+            }
+        }, 200);
+    }
+</script>
+<script>
+    function rotateGhost(ghost, left, right) {
+        ghost.inRotation = true;
+        if(Math.random() < 0.5) {
+            if (maze.data[right[0]][right[1]] != 1) {
+                ghost.targetHeadingCnt = (ghost.currentHeadingCnt - 1);
+                ghost.unitRotation = -ghost.stepSize;
+            } else if (maze.data[left[0]][left[1]] != 1) {
+                ghost.targetHeadingCnt = (ghost.currentHeadingCnt + 1);
+                ghost.unitRotation = ghost.stepSize;
+            } else {
+                ghost.targetHeadingCnt = ghost.currentHeadingCnt + 2;
+                ghost.unitRotation = ghost.stepSize * 2;
+            }
+        } else {
+            if (maze.data[left[0]][left[1]] != 1) {
+                ghost.targetHeadingCnt = (ghost.currentHeadingCnt + 1);
+                ghost.unitRotation = ghost.stepSize;
+            } else if (maze.data[right[0]][right[1]] != 1) {
+                ghost.targetHeadingCnt = (ghost.currentHeadingCnt - 1);
+                ghost.unitRotation = -ghost.stepSize;
+            } else {
+                ghost.targetHeadingCnt = ghost.currentHeadingCnt + 2;
+                ghost.unitRotation = ghost.stepSize * 2;
+            }
+        }
+    }
+
+    function createAI(ghost) {
+        setInterval(function() {
+            if (ghost.inMotion || ghost.inRotation) return;
+            var forward = [ghost.currentPosition[0], ghost.currentPosition[1]];
+            var left = [ghost.currentPosition[0], ghost.currentPosition[1]];
+            var right = [ghost.currentPosition[0], ghost.currentPosition[1]];
+            var backward = [ghost.currentPosition[0], ghost.currentPosition[1]];
+
+            switch(ghost.currentHeadingCnt){
+                case 0:
+                    forward[0] += 1;
+                    left[1] += 1;
+                    right[1] -= 1;
+                    backward[0] -= 1;
+                    ghost.unitMotion = [ghost.stepSize, 0];
+                    break;
+                case 1:
+                    forward[1] += 1;
+                    left[0] -= 1;
+                    right[0] += 1;
+                    backward[1] -= 1;
+                    ghost.unitMotion = [0, ghost.stepSize];
+                    break;
+                case 2:
+                    forward[0] -= 1;
+                    left[1] -= 1;
+                    right[1] += 1;
+                    backward[0] += 1;
+                    ghost.unitMotion = [-ghost.stepSize, 0];
+                    break;
+                case 3:
+                    forward[1] -= 1;
+                    left[0] += 1;
+                    right[0] -= 1;
+                    backward[1] += 1;
+                    ghost.unitMotion = [0, -ghost.stepSize];
+                    break;
+                default:
+                    console.log("ERROR, INVALID CASE");
+            }
+
+            if (forward[0] >= maze.sizeX) {
+                ghost.currentPosition[0] = -1.;
+                ghost.animateToPosition[0] = 0.;
+                ghost.animateToPosition[1] = ghost.currentPosition[1];
+                ghost.inMotion = true;
+            } else if (forward[0] < 0.) {
+                ghost.currentPosition[0] = maze.sizeX;
+                ghost.animateToPosition[0] = maze.sizeX - 1.;
+                ghost.animateToPosition[1] = ghost.currentPosition[1];
+                ghost.inMotion = true;
+            } else if (forward[1] >= maze.sizeY) {
+                ghost.currentPosition[1] = -1.;
+                ghost.animateToPosition[0] = ghost.currentPosition[0];
+                ghost.animateToPosition[1] = 0.;
+                ghost.inMotion = true;
+            } else if (forward[1] < 0.) {
+                ghost.currentPosition[1] = maze.sizeY;
+                ghost.animateToPosition[0] = ghost.currentPosition[0];
+                ghost.animateToPosition[1] = maze.sizeY - 1.;
+                ghost.inMotion = true;
+            } else if (maze.data[forward[0]][forward[1]] != 1) {
+                if (Math.random() < 0.3 && (maze.data[left[0]][left[1]] != 1 || maze.data[right[0]][right[1]] != 1)) {
+                    rotateGhost(ghost, left, right);
+                } else {
+                    ghost.animateToPosition = forward;
+                    ghost.inMotion = true;
+                }
+            } else {
+                rotateGhost(ghost, left, right);
+            }
+        }, 50);
+    }
+</script>
+<script>
+    createAI(redGhost);
+    createAI(blueGhost);
+    createAI(pinkGhost);
+    createAI(orangeGhost);
+</script> 
+</body>
+</html>

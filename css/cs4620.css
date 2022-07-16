@@ -1,0 +1,473 @@
+body {
+  background: black;
+  font-family: 'Press Start 2P', cursive;
+  color:white;
+}
+
+div#main {
+    padding-top: 60px;
+    font-size: 15px;
+}
+h1 {
+    font-size: 45px;
+    font-weight: 600;
+}
+h1#head1 {
+    margin-top: 2ex;
+    margin-bottom: 0.5ex;
+}
+h1#head2 {
+    margin-top: 0ex;
+    margin-bottom: 1.7ex;
+}
+h1 .subtitle {
+    font-weight: 300;
+}
+h2 {
+    font-size: 24px;
+    margin-top: 6ex;
+    margin-bottom: 2ex;
+}
+h3 {
+    font-size: 18px;
+    margin-top: 2ex;
+    margin-bottom: 1ex;
+}
+a.accordion-toggle h3 {
+    color: black;
+}
+
+p.courseinfo {
+    font-size: 22px;
+    margin-bottom: 0px;
+}
+p.staff {
+    font-size: 18px;
+    margin-top: 0ex;
+}
+p.coursedesc {
+    font-size: 14px;
+    margin-top: 5ex;
+}
+
+table.sched {
+    width: 100%;
+    border-collapse: collapse;
+}
+table.sched th {
+    padding: .5ex .5em;
+    margin: 0;
+    font-weight: bold;
+    text-align: left;
+}
+table.sched td {
+    padding: .3ex .5em;
+    margin: 0;
+    vertical-align: middle;
+    text-align: left;
+    border-style: none solid;
+    border-color: #ddd;
+    border-width: 0px 1px;
+}
+table.sched tr { padding: 0; margin: 0 }
+
+table.sched th.month, table.sched td.month,
+table.sched th.day, table.sched td.day,
+table.sched td.sec { width: 1px }
+table.sched th.ref, table.sched td.ref,
+table.sched th.hwdue, table.sched td.projdue {
+    text-align: center;
+    width: 1px;
+}
+table.sched td.day { text-align: right }
+table.sched td.sec { text-align: left }
+table.sched th.month { text-align: center }
+
+table.sched th.month,
+table.sched td.day,
+table.sched td.sec { padding-left: 12px }
+table.sched td.month { padding-left: 0.2em; border-left-width: 0 }
+table.sched td.day { padding-left: 2em; padding-right: 0.2em; border-right-width: 0 }
+table.sched td.day,
+table.sched td.sec { border-left-width: 0 }
+table.sched td.projdue {
+    border-right-width: 0;
+    width: 10em;
+}
+
+table.sched tr.evn { background-color: #fff; }
+table.sched tr.odd { background-color: #eee; }
+table.sched tr.now { background-color: #ff4; }
+table.sched tr.exam { background-color: #bb9; }
+table.sched tr.exam td.ref { color: #bb9 }
+table.sched tr.exam td.ref a.dis { color: #bb9 }
+table.sched tr.due { background-color: #eee; }
+table.sched tr.due td.ref { color: #eee }
+table.sched tr.due td.ref a.dis { color: #eee }
+table.sched tr.evn td { border-color: #eee }
+table.sched tr.odd td { border-color: #fff }
+table.sched td.ref { color: #888 }
+table.sched tr.dis { color: #888 }
+table.sched tr.dis td.ref { color: #fff }
+table.sched tr.dis td.ref a.dis { color: #fff }
+table.sched tr.header {
+    color: white;
+    background-color: #888;
+    border-top: 6px solid white;
+}
+
+div.homework {
+    border: 1px solid black;
+    border-radius: 15px;
+    padding: 20px 30px;
+    margin: 30px 0px;
+    background-color: #ddd;
+}
+div.homework h3 {
+    font-size: 20px;
+    margin-top: 0ex;
+    margin-bottom: 0ex;
+}
+div.accordion-inner {
+    margin-top: 15px;
+    padding-top: 15px;
+}
+div.accordion-group {
+    margin-top: 20px;
+    margin-bottom: 0px;
+    float: none;
+}
+h3 .subtitle {
+    font-weight: 300;
+}
+img.hwpic {
+    float: right;
+    padding: 5px;
+    border: 1px solid black;
+    margin: 10px;
+}
+div.proj-steps {
+    padding: 0;
+    margin: 0 0 0 2em;
+}
+code {
+    background: none;
+    border: none;
+}
+
+#score-id {
+    margin: 10px 20px;
+/*    background: rgba(0, 0, 0, 0.7); */
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    color: white;
+    font-family: 'Press Start 2P', cursive;
+    z-index:2;
+    font-size:22px;
+}
+
+#game-over {   
+    position: absolute; 
+    left: 0px;
+    top: 0px;
+    width:800px;
+    height:600px;
+    color: white;
+    background: black;
+    font-family: 'Press Start 2P', cursive;
+    text-align: center;
+    line-height: 600px;
+    font-size:30px;
+    z-index:1;
+    display:none;
+    cursor:pointer;
+}
+
+#game-win {   
+    position: absolute; 
+    left: 0px;
+    top: 0px;
+    width:800px;
+    height:600px;
+    color: white;
+    background: black;
+    font-family: 'Press Start 2P', cursive;
+    text-align: center;
+    line-height: 600px;
+    font-size:30px;
+    z-index:1;
+    display:none;
+    cursor:pointer;
+}
+
+.retro {
+  font-size:40px;
+  color:yellow;
+  text-align: center;
+  font-family: 'Press Start 2P', cursive;
+}
+
+.btn-default.pink {
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid #FFBFD8;
+}
+.btn-default.pink:focus,
+.btn-default.pink.focus {
+  color: #fff;
+  background-color: #ff99cc;
+  border-color: #ff99cc;
+}
+.btn-default.pink:hover {
+  color: #fff;
+  background-color: #ff99cc;
+  border-color: #ff99cc;
+}
+.btn-default.pink:active,
+.btn-default.pink.active,
+.open > .dropdown-toggle.btn-default.pink {
+  color: #fff;
+  background-color: #ff99cc;
+  border-color: #ff99cc;
+}
+.btn-default.pink:active:hover,
+.btn-default.pink.active:hover,
+.open > .dropdown-toggle.btn-default.pink:hover,
+.btn-default.pink:active:focus,
+.btn-default.pink.active:focus,
+.open > .dropdown-toggle.btn-default.pink:focus,
+.btn-default.pink:active.focus,
+.btn-default.pink.active.focus,
+.open > .dropdown-toggle.btn-default.pink.focus {
+  color: #fff;
+  background-color: #ff99cc;
+  border-color: #ff99cc;
+}
+.btn-default.pink:active,
+.btn-default.pink.active,
+.open > .dropdown-toggle.btn-default.pink {
+  background-image: none;
+}
+.btn-default.pink.disabled:hover,
+.btn-default.pink[disabled]:hover,
+fieldset[disabled] .btn-default.pink:hover,
+.btn-default.pink.disabled:focus,
+.btn-default.pink[disabled]:focus,
+fieldset[disabled] .btn-default.pink:focus,
+.btn-default.pink.disabled.focus,
+.btn-default.pink[disabled].focus,
+fieldset[disabled] .btn-default.pink.focus {
+  background-color: #fff;
+  border-color: #FFBFD8;
+}
+.btn-default.pink .badge {
+  color: #fff;
+  background-color: #333;
+}
+.btn-default.blue {
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid #80d4ff;
+}
+.btn-default.blue:focus,
+.btn-default.blue.focus {
+  color: #fff;
+  background-color: #4dc3ff;
+  border-color: #4dc3ff;
+}
+.btn-default.blue:hover {
+  color: #fff;
+  background-color: #4dc3ff;
+  border-color: #4dc3ff;
+}
+.btn-default.blue:active,
+.btn-default.blue.active,
+.open > .dropdown-toggle.btn-default.blue {
+  color: #fff;
+  background-color: #4dc3ff;
+  border-color: #4dc3ff;
+}
+.btn-default.blue:active:hover,
+.btn-default.blue.active:hover,
+.open > .dropdown-toggle.btn-default.blue:hover,
+.btn-default.blue:active:focus,
+.btn-default.blue.active:focus,
+.open > .dropdown-toggle.btn-default.blue:focus,
+.btn-default.blue:active.focus,
+.btn-default.blue.active.focus,
+.open > .dropdown-toggle.btn-default.blue.focus {
+  color: #fff;
+  background-color: #4dc3ff;
+  border-color: #4dc3ff;
+}
+.btn-default.blue:active,
+.btn-default.blue.active,
+.open > .dropdown-toggle.btn-default.blue {
+  background-image: none;
+}
+.btn-default.blue.disabled:hover,
+.btn-default.blue[disabled]:hover,
+fieldset[disabled] .btn-default.blue:hover,
+.btn-default.blue.disabled:focus,
+.btn-default.blue[disabled]:focus,
+fieldset[disabled] .btn-default.blue:focus,
+.btn-default.blue.disabled.focus,
+.btn-default.blue[disabled].focus,
+fieldset[disabled] .btn-default.blue.focus {
+  background-color: #fff;
+  border-color: #4dc3ff;
+}
+.btn-default.blue .badge {
+  color: #fff;
+  background-color: #333;
+}
+
+.btn-default.orange {
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid #ffad33;
+}
+.btn-default.orange:focus,
+.btn-default.orange.focus {
+  color: #fff;
+  background-color: #ff9900;
+  border-color: #ff9900;
+}
+.btn-default.orange:hover {
+  color: #fff;
+  background-color: #ff9900;
+  border-color: #ff9900;
+}
+.btn-default.orange:active,
+.btn-default.orange.active,
+.open > .dropdown-toggle.btn-default.orange {
+  color: #fff;
+  background-color: #ff9900;
+  border-color: #ff9900;
+}
+.btn-default.orange:active:hover,
+.btn-default.orange.active:hover,
+.open > .dropdown-toggle.btn-default.orange:hover,
+.btn-default.orange:active:focus,
+.btn-default.orange.active:focus,
+.open > .dropdown-toggle.btn-default.orange:focus,
+.btn-default.orange:active.focus,
+.btn-default.orange.active.focus,
+.open > .dropdown-toggle.btn-default.orange.focus {
+  color: #fff;
+  background-color: #FF9900;
+  border-color: #FF9900;
+}
+.btn-default.orange:active,
+.btn-default.orange.active,
+.open > .dropdown-toggle.btn-default.orange {
+  background-image: none;
+}
+.btn-default.orange.disabled:hover,
+.btn-default.orange[disabled]:hover,
+fieldset[disabled] .btn-default.orange:hover,
+.btn-default.orange.disabled:focus,
+.btn-default.orange[disabled]:focus,
+fieldset[disabled] .btn-default.orange:focus,
+.btn-default.orange.disabled.focus,
+.btn-default.orange[disabled].focus,
+fieldset[disabled] .btn-default.orange.focus {
+  background-color: #fff;
+  border-color: #FF9900;
+}
+.btn-default.orange .badge {
+  color: #fff;
+  background-color: #333;
+}
+.btn-default.red {
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid #FF0000;
+}
+.btn-default.red:focus,
+.btn-default.red.focus {
+  color: #fff;
+  background-color: #cc0000;
+  border-color: #cc0000;
+}
+.btn-default.red:hover {
+  color: #fff;
+  background-color: #cc0000;
+  border-color: #cc0000;
+}
+.btn-default.red:active,
+.btn-default.red.active,
+.open > .dropdown-toggle.btn-default.red {
+  color: #fff;
+  background-color: #cc0000;
+  border-color: #cc0000;
+}
+.btn-default.red:active:hover,
+.btn-default.red.active:hover,
+.open > .dropdown-toggle.btn-default.red:hover,
+.btn-default.red:active:focus,
+.btn-default.red.active:focus,
+.open > .dropdown-toggle.btn-default.red:focus,
+.btn-default.red:active.focus,
+.btn-default.red.active.focus,
+.open > .dropdown-toggle.btn-default.red.focus {
+  color: #fff;
+  background-color: #cc0000;
+  border-color: #cc0000;
+}
+.btn-default.red:active,
+.btn-default.red.active,
+.open > .dropdown-toggle.btn-default.red {
+  background-image: none;
+}
+.btn-default.red.disabled:hover,
+.btn-default.red[disabled]:hover,
+fieldset[disabled] .btn-default.red:hover,
+.btn-default.red.disabled:focus,
+.btn-default.red[disabled]:focus,
+fieldset[disabled] .btn-default.red:focus,
+.btn-default.red.disabled.focus,
+.btn-default.red[disabled].focus,
+fieldset[disabled] .btn-default.red.focus {
+  background-color: #fff;
+  border-color: #cc0000;
+}
+.btn-default.red .badge {
+  color: #fff;
+  background-color: #333;
+}
+
+.pac-name-icon.orange{
+    background: url(images/rsz_orange_pacman.png);
+    width:40px;
+    height:40px;
+}
+
+.pac-name-icon.blue{
+    background: url(images/rsz_21blue_ghost.png);
+    width:40px;
+    height:40px;
+}
+
+.pac-name-icon.pink{
+    background: url(images/rsz_pink_ghost.png);
+    width:40px;
+    height:40px;
+}
+
+.pac-name-icon.red{
+    background: url(images/rsz_red_ghost.png);
+    width:40px;
+    height:40px;
+}
+
+.pac-name-text {
+    display: inline-block;
+    width: 400px;
+    align-self: self-end;
+    height: 40px;
+    padding: 15px 20px 20px 45px;
+}
+
