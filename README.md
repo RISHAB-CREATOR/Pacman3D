@@ -13,7 +13,7 @@ Welcome to PACMAN3D, the 3D remastered version of the classic Pac-Man game! Get 
 
 ## How to Play 🕹️
 
-1. Open this [GAME LINK](https://rishab-creator.github.io/Pacman3D/)
+1. Open this [GAME LINK](https://pacman-3d.vercel.app/)
 2. Launch the game and start playing by controlling Pac-Man using the arrow keys or joystick.
 3. Navigate through the 3D maze, eating pellets and avoiding ghosts.
 4. Collect power-ups to gain temporary invincibility or other advantages.
